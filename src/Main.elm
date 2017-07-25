@@ -1,5 +1,5 @@
-import Html exposing (Html, a, button, div, h3, hr, p, text)
-import Html.Attributes exposing (class, href, type_)
+import Html exposing (Html, a, button, div, form, h3, hr, input, p, text, textarea)
+import Html.Attributes exposing (class, href, type_, value)
 import Http
 import Navigation
 import UrlParser exposing (map, oneOf, parsePath, s, string, (</>))
@@ -61,6 +61,14 @@ renderComment lookup =
     (\l -> 
         div [ class "comment" ] 
             [ p [] [ text l.text ] 
+            , div [ class "reply" ] 
+                [ a [ href "javascript:void(0)" ] [ text "Reply" ]
+                , form [] 
+                    [ textarea [] []
+                    , input [ type_ "submit", value "Reply" ] []
+                    , div [ class "preview" ] []
+                    ]
+                ]
             , div [ class "children" ] (renderComments (getChildren l.id lookup) lookup) 
             ]
     )
