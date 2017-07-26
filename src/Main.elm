@@ -1,7 +1,7 @@
 import Dict exposing (Dict)
 import Html exposing (Html, a, div, form, h3, hr, input, p, text, textarea)
 import Html.Attributes exposing (class, href, name, type_, value)
-import Html.Events exposing (on, onInput, onSubmit)
+import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Http
 import Json.Decode as Json
 import Navigation
@@ -78,17 +78,16 @@ renderComment lookup replies =
         div [ class "comment" ] 
             [ p [] [ text l.text ] 
             , div [ class "reply" ] 
-                [ a [] [ text "Reply" ]
-                , form [] 
-                    [ textarea [ name l.id ] []
-                    , input [ type_ "submit", value "Reply" ] []
-                    , div [ class "preview" ] 
-                        (case Dict.get l.id replies of
-                            Nothing ->
-                                []
-                            Just reply ->
-                                [ text reply ])
-                    ]
+                [ case Dict.get l.id replies of
+                    Nothing ->
+                        a [ onClick (UpdateReply l.id "") ] [ text "Reply" ]
+                    Just reply ->
+                        form [] 
+                            [ textarea [ name l.id ] []
+                            , input [ type_ "submit", value "Reply" ] []
+                            , div [ class "preview" ] [ text reply ]
+                            ]
+                    
                 ]
             , div [ class "children" ] (renderComments (getChildren l.id lookup) lookup replies) 
             ]
