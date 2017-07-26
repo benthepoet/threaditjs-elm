@@ -1,8 +1,9 @@
 import Dict exposing (Dict)
 import Html exposing (Html, a, div, form, h3, hr, input, p, text, textarea)
-import Html.Attributes exposing (class, href, type_, value)
-import Html.Events exposing (onInput, onSubmit)
+import Html.Attributes exposing (class, href, name, type_, value)
+import Html.Events exposing (on, onInput, onSubmit)
 import Http
+import Json.Decode as Json
 import Navigation
 import UrlParser exposing (map, oneOf, parsePath, s, string, (</>))
 
@@ -64,14 +65,22 @@ locationChange location =
         |> PageChange
 
 
+onFormInput tagger =
+    on "input" <|
+        Json.at [ "target" ] <|
+            Json.map2 tagger
+                (Json.field "name" Json.string)
+                (Json.field "value" Json.string)
+
+
 renderComment lookup replies =
     (\l -> 
         div [ class "comment" ] 
             [ p [] [ text l.text ] 
             , div [ class "reply" ] 
-                [ a [ href "javascript:void(0)" ] [ text "Reply" ]
+                [ a [] [ text "Reply" ]
                 , form [] 
-                    [ textarea [ onInput (\s -> UpdateReply l.id s) ] []
+                    [ textarea [ name l.id ] []
                     , input [ type_ "submit", value "Reply" ] []
                     , div [ class "preview" ] 
                         (case Dict.get l.id replies of
@@ -183,7 +192,10 @@ view model =
             div [ class "thread-list" ] (renderThreads model.threads)
         
         CommentList id ->
-            div [ class "comments" ] (renderComments (List.take 1 model.comments) model.comments model.replies)
+            div [ class "comments" ] 
+                [ form [ onFormInput UpdateReply ] 
+                    (renderComments (List.take 1 model.comments) model.comments model.replies)
+                ]
             
         NotFound ->
             div [] []
