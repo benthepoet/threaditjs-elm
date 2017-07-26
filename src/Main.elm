@@ -1,5 +1,7 @@
-import Html exposing (Html, a, button, div, form, h3, hr, input, p, text, textarea)
+import Dict exposing (Dict)
+import Html exposing (Html, a, div, form, h3, hr, input, p, text, textarea)
 import Html.Attributes exposing (class, href, type_, value)
+import Html.Events exposing (onInput, onSubmit)
 import Http
 import Navigation
 import UrlParser exposing (map, oneOf, parsePath, s, string, (</>))
@@ -11,6 +13,8 @@ import Threads exposing (Thread, getComments, getList)
 
 type alias Model =
     { page : Page
+    , post : String
+    , replies : Dict String String
     , threads : List Thread
     , comments : List Thread
     }
@@ -20,6 +24,9 @@ type Msg
     = ProcessThreads (Result Http.Error (List Thread))
     | ProcessComments (Result Http.Error (List Thread))
     | PageChange (Maybe Page)
+    | UpdateReply String String
+    | UpdatePost String
+    | CreatePost
 
     
 type Page 
@@ -57,25 +64,30 @@ locationChange location =
         |> PageChange
 
 
-renderComment lookup =
+renderComment lookup replies =
     (\l -> 
         div [ class "comment" ] 
             [ p [] [ text l.text ] 
             , div [ class "reply" ] 
                 [ a [ href "javascript:void(0)" ] [ text "Reply" ]
                 , form [] 
-                    [ textarea [] []
+                    [ textarea [ onInput (\s -> UpdateReply l.id s) ] []
                     , input [ type_ "submit", value "Reply" ] []
-                    , div [ class "preview" ] []
+                    , div [ class "preview" ] 
+                        (case Dict.get l.id replies of
+                            Nothing ->
+                                []
+                            Just reply ->
+                                [ text reply ])
                     ]
                 ]
-            , div [ class "children" ] (renderComments (getChildren l.id lookup) lookup) 
+            , div [ class "children" ] (renderComments (getChildren l.id lookup) lookup replies) 
             ]
     )
 
 
-renderComments comments lookup =
-    List.map (renderComment lookup) comments
+renderComments comments lookup replies =
+    List.map (renderComment lookup replies) comments
 
 
 renderThread thread =
@@ -87,8 +99,15 @@ renderThread thread =
 
 
 renderThreads threads =
-    List.map renderThread threads
-
+    let 
+        threadList = List.map renderThread threads
+    in
+        threadList ++ 
+            [ form [ onSubmit CreatePost ] 
+                [ textarea [ onInput UpdatePost ] []
+                , input [ type_ "submit", value "Post" ] []
+                ]
+            ]
 
 route =
     oneOf
@@ -120,7 +139,7 @@ main =
 init : Navigation.Location -> (Model, Cmd Msg)
 init location =
     let
-        model = Model NotFound [] []
+        model = Model NotFound "" Dict.empty [] []
     in
         updatePage (parsePath route location) model
     
@@ -147,6 +166,15 @@ update msg model =
         ProcessThreads (Err _) ->
             (model, Cmd.none)
             
+        UpdateReply id text ->
+            ({ model | replies = Dict.insert id text model.replies }, Cmd.none)
+            
+        UpdatePost post ->
+            ({ model | post = post }, Cmd.none)
+            
+        CreatePost ->
+            (model, Cmd.none)
+            
             
 view : Model -> Html Msg
 view model =
@@ -155,7 +183,7 @@ view model =
             div [ class "thread-list" ] (renderThreads model.threads)
         
         CommentList id ->
-            div [ class "comments" ] (renderComments (List.take 1 model.comments) model.comments)
+            div [ class "comments" ] (renderComments (List.take 1 model.comments) model.comments model.replies)
             
         NotFound ->
             div [] []
