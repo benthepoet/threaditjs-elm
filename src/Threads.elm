@@ -1,5 +1,7 @@
 module Threads exposing (Thread, getComments, getList)
 
+import Dict
+import Set
 import Http
 import Json.Decode as Decode
 
@@ -12,23 +14,24 @@ type alias Thread =
     , text : String
     , commentCount : Int
     , parentId : Maybe String
+    , children : Comments
     }
     
     
+type Comments = Comments (List Thread)
+    
 -- DECODERS
     
-    
-threadListDecoder =
-    Decode.at ["data"]
-        <| Decode.list threadDecoder
-
 
 threadDecoder =
-    Decode.map4 Thread
-        (Decode.field "id" Decode.string)
-        (Decode.field "text" Decode.string)
-        (Decode.field "comment_count" Decode.int)
-        (Decode.maybe (Decode.field "parent_id" Decode.string))
+    Decode.at ["data"]
+        <| Decode.list
+            <| Decode.map5 Thread
+                (Decode.field "id" Decode.string)
+                (Decode.field "text" Decode.string)
+                (Decode.field "comment_count" Decode.int)
+                (Decode.maybe (Decode.field "parent_id" Decode.string))
+                (Decode.succeed (Comments []))
         
         
 -- DATA FUNCTIONS
@@ -39,7 +42,7 @@ getComments id msg =
         url = "http://api.threaditjs.com/comments/" ++ id
     in
         Http.send msg
-            <| Http.get url threadListDecoder
+            <| Http.get url threadDecoder
 
 
 getList msg =
@@ -47,5 +50,31 @@ getList msg =
         url = "http://api.threaditjs.com/threads"
     in
         Http.send msg
-            <| Http.get url threadListDecoder
+            <| Http.get url threadDecoder
     
+    
+node thread lookup =
+    let 
+        children = Maybe.withDefault [] (Dict.get thread.id lookup)
+    in
+        { thread | children = List.map (\l -> node l lookup) children }
+    
+start threads =
+    let
+        root = List.take 1 threads
+        lookup = getLookupDict threads
+    in
+        List.map (\l -> node l lookup) root
+    
+    
+getLookupDict threads =
+    let
+        keys = getParentKeys threads
+    in
+        Dict.fromList
+            <| List.map (\l -> (l, List.filter (\k -> k.parentId == l) threads)) (Set.toList keys)
+    
+    
+getParentKeys threads =
+    Set.fromList
+        <| List.map (\l -> l.parentId) threads
