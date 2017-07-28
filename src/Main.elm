@@ -7,7 +7,7 @@ import Json.Decode as Json
 import Navigation
 import UrlParser exposing (map, oneOf, parsePath, s, string, (</>))
 
-import Threads exposing (Thread, getComments, getList)
+import Threads
 
 
 -- TYPES
@@ -16,14 +16,14 @@ type alias Model =
     { page : Page
     , post : String
     , replies : Dict String String
-    , threads : List Thread
-    , comments : List Thread
+    , threads : List Threads.Thread
+    , comments : List Threads.Thread
     }
 
 
 type Msg 
-    = ProcessThreads (Result Http.Error (List Thread))
-    | ProcessComments (Result Http.Error (List Thread))
+    = ProcessThreads (Result Http.Error (List Threads.Thread))
+    | ProcessComments (Result Http.Error (List Threads.Thread))
     | PageChange (Maybe Page)
     | UpdateReply String String
     | UpdatePost String
@@ -42,22 +42,13 @@ type Page
 changeCmd page =
     case page of
         ThreadList ->
-            getList ProcessThreads
+            Threads.getList ProcessThreads
             
         CommentList id ->
-            getComments id ProcessComments
+            Threads.getComments id ProcessComments
             
         NotFound ->
             Cmd.none
-
-
-getChildren id comments =
-    List.filter (\l -> 
-        case l.parentId of
-            Nothing -> 
-                False
-            Just parentId ->
-                parentId == id) comments
 
 
 locationChange location = 
@@ -73,29 +64,27 @@ onFormInput tagger =
                 (Json.field "value" Json.string)
 
 
-renderComment lookup replies =
-    (\l -> 
-        div [ class "comment" ] 
-            [ p [] [ text l.text ] 
-            , div [ class "reply" ] 
-                [ case Dict.get l.id replies of
-                    Nothing ->
-                        a [ onClick (UpdateReply l.id "") ] [ text "Reply" ]
-                    Just reply ->
-                        form [] 
-                            [ textarea [ name l.id ] []
-                            , input [ type_ "submit", value "Reply" ] []
-                            , div [ class "preview" ] [ text reply ]
-                            ]
-                    
-                ]
-            , div [ class "children" ] (renderComments (getChildren l.id lookup) lookup replies) 
+viewComment replies thread =
+    div [ class "comment" ] 
+        [ p [] [ text thread.text ] 
+        , div [ class "reply" ] 
+            [ case Dict.get thread.id replies of
+                Nothing ->
+                    a [ onClick (UpdateReply thread.id "") ] [ text "Reply" ]
+                Just reply ->
+                    form [] 
+                        [ textarea [ name thread.id ] []
+                        , input [ type_ "submit", value "Reply" ] []
+                        , div [ class "preview" ] [ text reply ]
+                        ]
+                
             ]
-    )
-
-
-renderComments comments lookup replies =
-    List.map (renderComment lookup replies) comments
+        , div [ class "children" ] (List.map (viewComment replies) (
+            case thread.children of
+                Threads.Comments (list) ->
+                    list
+        ))
+        ]
 
 
 renderThread thread =
@@ -159,7 +148,7 @@ update msg model =
             updatePage maybePage model
         
         ProcessComments (Ok comments) ->
-            ({ model | comments = comments}
+            ({ model | comments = Threads.transform comments}
             , Cmd.none
             )
             
@@ -193,7 +182,7 @@ view model =
         CommentList id ->
             div [ class "comments" ] 
                 [ form [ onFormInput UpdateReply ] 
-                    (renderComments (List.take 1 model.comments) model.comments model.replies)
+                    (List.map (viewComment model.replies) model.comments)
                 ]
             
         NotFound ->

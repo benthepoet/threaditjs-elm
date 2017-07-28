@@ -1,4 +1,4 @@
-module Threads exposing (Thread, getComments, getList)
+module Threads exposing (Thread, Comments(Comments), getComments, getList, transform)
 
 import Dict
 import Set
@@ -57,24 +57,24 @@ node thread lookup =
     let 
         children = Maybe.withDefault [] (Dict.get thread.id lookup)
     in
-        { thread | children = List.map (\l -> node l lookup) children }
+        { thread | children = Comments (List.map (\l -> node l lookup) children) }
     
-start threads =
+transform threads =
     let
         root = List.take 1 threads
         lookup = getLookupDict threads
     in
         List.map (\l -> node l lookup) root
     
-    
+
 getLookupDict threads =
     let
         keys = getParentKeys threads
     in
         Dict.fromList
-            <| List.map (\l -> (l, List.filter (\k -> k.parentId == l) threads)) (Set.toList keys)
+            <| List.map (\l -> (l, List.filter (\k -> (Maybe.withDefault "" k.parentId) == l) threads)) (Set.toList keys)
     
     
 getParentKeys threads =
     Set.fromList
-        <| List.map (\l -> l.parentId) threads
+        <| List.map (\l -> Maybe.withDefault "" l.parentId) threads
