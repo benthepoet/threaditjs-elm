@@ -24,6 +24,7 @@ type alias Model =
 type Msg 
     = ProcessThreads (Result Http.Error (List Threads.Thread))
     | ProcessComments (Result Http.Error (List Threads.Thread))
+    | ProcessThread (Result Http.Error Threads.Thread)
     | PageChange (Maybe Page)
     | UpdateReply String String
     | UpdatePost String
@@ -163,6 +164,14 @@ update msg model =
         ProcessThreads (Err _) ->
             (model, Cmd.none)
             
+        ProcessThread (Ok thread) ->
+            ({ model 
+                | threads = model.threads ++ [thread] 
+                , post = "" }, Cmd.none)
+            
+        ProcessThread (Err _) ->
+            (model, Cmd.none)
+            
         UpdateReply id text ->
             ({ model | replies = Dict.insert id text model.replies }, Cmd.none)
             
@@ -170,7 +179,7 @@ update msg model =
             ({ model | post = post }, Cmd.none)
             
         CreatePost ->
-            (model, Cmd.none)
+            (model, Threads.createThread model.post ProcessThread)
             
             
 view : Model -> Html Msg

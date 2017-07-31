@@ -1,9 +1,10 @@
-module Threads exposing (Thread, Comments(Comments), getComments, getList, transform)
+module Threads exposing (Thread, Comments(Comments), createThread, getComments, getList, transform)
 
 import Dict
 import Set
 import Http
 import Json.Decode as Decode
+import Json.Encode as Encode
 
 
 -- TYPES
@@ -21,20 +22,35 @@ type alias Thread =
 type Comments = Comments (List Thread)
     
 -- DECODERS
-    
 
-threadDecoder =
-    Decode.at ["data"]
-        <| Decode.list
-            <| Decode.map5 Thread
-                (Decode.field "id" Decode.string)
-                (Decode.field "text" Decode.string)
-                (Decode.field "comment_count" Decode.int)
-                (Decode.maybe (Decode.field "parent_id" Decode.string))
-                (Decode.succeed (Comments []))
+
+threadDecoder = 
+    Decode.map5 Thread
+        (Decode.field "id" Decode.string)
+        (Decode.field "text" Decode.string)
+        (Decode.field "comment_count" Decode.int)
+        (Decode.maybe (Decode.field "parent_id" Decode.string))
+        (Decode.succeed (Comments []))
+
+        
+-- ENCODERS
+
+
+threadEncoder text =
+    Encode.object
+        [ ("text", Encode.string text)
+        ]
         
         
 -- DATA FUNCTIONS
+
+
+createThread text msg = 
+    let
+        url = "http://api.threaditjs.com/threads/create"
+    in
+        Http.send msg
+            <| Http.post url (threadEncoder text |> Http.jsonBody) (Decode.at ["data"] threadDecoder)
 
 
 getComments id msg =
@@ -42,7 +58,7 @@ getComments id msg =
         url = "http://api.threaditjs.com/comments/" ++ id
     in
         Http.send msg
-            <| Http.get url threadDecoder
+            <| Http.get url (Decode.at ["data"] <| Decode.list threadDecoder)
 
 
 getList msg =
@@ -50,7 +66,7 @@ getList msg =
         url = "http://api.threaditjs.com/threads"
     in
         Http.send msg
-            <| Http.get url threadDecoder
+            <| Http.get url (Decode.at ["data"] <| Decode.list threadDecoder)
     
     
 node thread lookup =
