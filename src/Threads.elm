@@ -16,89 +16,97 @@ type alias Thread =
     , commentCount : Int
     , parentId : Maybe String
     }
-    
+
+
 
 -- DECODERS
 
 
-threadDecoder = 
+threadDecoder =
     Decode.map4 Thread
         (Decode.field "id" Decode.string)
         (Decode.field "text" Decode.string)
         (Decode.field "comment_count" Decode.int)
         (Decode.maybe (Decode.field "parent_id" Decode.string))
 
-        
+
+
 -- ENCODERS
 
 
 commentEncoder text parent =
     Encode.object
-        [ ("text", Encode.string text)
-        , ("parent", Encode.string parent)
+        [ ( "text", Encode.string text )
+        , ( "parent", Encode.string parent )
         ]
 
 
 threadEncoder text =
     Encode.object
-        [ ("text", Encode.string text)
+        [ ( "text", Encode.string text )
         ]
-        
-        
+
+
+
 -- DATA FUNCTIONS
 
 
-createComment text parent msg = 
+createComment text parent msg =
     let
-        url = "http://api.threaditjs.com/comments/create"
+        url =
+            "http://api.threaditjs.com/comments/create"
     in
-        Http.send msg
-            <| Http.post url (commentEncoder text parent |> Http.jsonBody) (Decode.at ["data"] threadDecoder)
-    
+        Http.send msg <|
+            Http.post url (commentEncoder text parent |> Http.jsonBody) (Decode.at [ "data" ] threadDecoder)
 
-createThread text msg = 
+
+createThread text msg =
     let
-        url = "http://api.threaditjs.com/threads/create"
+        url =
+            "http://api.threaditjs.com/threads/create"
     in
-        Http.send msg
-            <| Http.post url (threadEncoder text |> Http.jsonBody) (Decode.at ["data"] threadDecoder)
+        Http.send msg <|
+            Http.post url (threadEncoder text |> Http.jsonBody) (Decode.at [ "data" ] threadDecoder)
 
 
 getComments id msg =
     let
-        url = "http://api.threaditjs.com/comments/" ++ id
+        url =
+            "http://api.threaditjs.com/comments/" ++ id
     in
-        Http.send msg
-            <| Http.get url (Decode.at ["data"] <| Decode.list threadDecoder)
+        Http.send msg <|
+            Http.get url (Decode.at [ "data" ] <| Decode.list threadDecoder)
 
 
 getList msg =
     let
-        url = "http://api.threaditjs.com/threads"
+        url =
+            "http://api.threaditjs.com/threads"
     in
-        Http.send msg
-            <| Http.get url (Decode.at ["data"] <| Decode.list threadDecoder)
-    
-    
+        Http.send msg <|
+            Http.get url (Decode.at [ "data" ] <| Decode.list threadDecoder)
+
+
 transform threads =
-    (getRoot threads, getLookup threads)
+    ( getRoot threads, getLookup threads )
 
 
 getLookup threads =
     let
-        keys = getKeys threads
+        keys =
+            getKeys threads
     in
-        Dict.fromList
-            <| List.map (getChildren threads) (Set.toList keys)
-    
+        Dict.fromList <|
+            List.map (getChildren threads) (Set.toList keys)
+
 
 getChildren threads key =
-    (key, List.filter (\l -> Maybe.withDefault "" l.parentId == key) threads)
-    
-    
+    ( key, List.filter (\l -> Maybe.withDefault "" l.parentId == key) threads )
+
+
 getKeys threads =
-    Set.fromList
-        <| List.map (\l -> Maybe.withDefault "" l.parentId) threads
+    Set.fromList <|
+        List.map (\l -> Maybe.withDefault "" l.parentId) threads
 
 
 getRoot threads =
