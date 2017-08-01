@@ -17,18 +17,20 @@ type alias Model =
     , post : String
     , replies : Dict String String
     , threads : List Threads.Thread
-    , comments : List Threads.Thread
+    , comments : (Maybe Threads.Thread, Dict.Dict String (List Threads.Thread))
     }
 
 
 type Msg 
     = ProcessThreads (Result Http.Error (List Threads.Thread))
     | ProcessComments (Result Http.Error (List Threads.Thread))
+    | ProcessComment (Result Http.Error Threads.Thread)
     | ProcessThread (Result Http.Error Threads.Thread)
     | PageChange (Maybe Page)
     | UpdateReply String String
     | UpdatePost String
     | CreatePost
+    | CreateComment String String
 
     
 type Page 
@@ -65,7 +67,7 @@ onFormInput tagger =
                 (Json.field "value" Json.string)
 
 
-viewComment replies thread =
+viewComment lookup replies thread =
     div [ class "comment" ] 
         [ p [] [ text thread.text ] 
         , div [ class "reply" ] 
@@ -73,18 +75,20 @@ viewComment replies thread =
                 Nothing ->
                     a [ onClick (UpdateReply thread.id "") ] [ text "Reply" ]
                 Just reply ->
-                    form [] 
+                    form [ onSubmit (CreateComment reply thread.id) ] 
                         [ textarea [ name thread.id ] []
                         , input [ type_ "submit", value "Reply" ] []
                         , div [ class "preview" ] [ text reply ]
                         ]
                 
             ]
-        , div [ class "children" ] (List.map (viewComment replies) (
-            case thread.children of
-                Threads.Comments (list) ->
-                    list
-        ))
+        , div [ class "children" ]
+            ( case Dict.get thread.id lookup of
+                Just children ->
+                    List.map (viewComment lookup replies) children
+                Nothing ->
+                    []
+            )
         ]
 
 
@@ -137,7 +141,7 @@ main =
 init : Navigation.Location -> (Model, Cmd Msg)
 init location =
     let
-        model = Model NotFound "" Dict.empty [] []
+        model = Model NotFound "" Dict.empty [] (Nothing, Dict.empty)
     in
         updatePage (parsePath route location) model
     
@@ -163,6 +167,25 @@ update msg model =
             
         ProcessThreads (Err _) ->
             (model, Cmd.none)
+        
+        ProcessComment (Ok thread) ->
+            case thread.parentId of
+                Just parentId ->
+                    let
+                        (root, lookup) = model.comments
+                        siblings = Maybe.withDefault [] <| Dict.get parentId lookup
+                    in    
+                        ({ model 
+                            | comments = (root, Dict.insert parentId (siblings ++ [thread]) lookup)
+                            , replies = Dict.remove parentId model.replies
+                        }, Cmd.none)
+                    
+                
+                Nothing ->
+                    (model, Cmd.none)
+
+        ProcessComment (Err _) ->
+            (model, Cmd.none)
             
         ProcessThread (Ok thread) ->
             ({ model 
@@ -178,6 +201,9 @@ update msg model =
         UpdatePost post ->
             ({ model | post = post }, Cmd.none)
             
+        CreateComment text parent ->
+            (model, Threads.createComment text parent ProcessComment)
+            
         CreatePost ->
             (model, Threads.createThread model.post ProcessThread)
             
@@ -189,10 +215,17 @@ view model =
             div [ class "thread-list" ] (renderThreads model.threads)
         
         CommentList id ->
-            div [ class "comments" ] 
-                [ form [ onFormInput UpdateReply ] 
-                    (List.map (viewComment model.replies) model.comments)
-                ]
+            let 
+                (root, lookup) = model.comments
+            in 
+                div [ class "comments" ]
+                    (case root of
+                        Just thread ->
+                            [ form [ onFormInput UpdateReply ] [viewComment lookup model.replies thread]
+                            ]
+                        Nothing ->
+                            []
+                    )
             
         NotFound ->
             div [] []

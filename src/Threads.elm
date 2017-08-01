@@ -1,4 +1,4 @@
-module Threads exposing (Thread, Comments(Comments), createThread, getComments, getList, transform)
+module Threads exposing (Thread, createComment, createThread, getComments, getList, transform)
 
 import Dict
 import Set
@@ -15,25 +15,28 @@ type alias Thread =
     , text : String
     , commentCount : Int
     , parentId : Maybe String
-    , children : Comments
     }
     
-    
-type Comments = Comments (List Thread)
-    
+
 -- DECODERS
 
 
 threadDecoder = 
-    Decode.map5 Thread
+    Decode.map4 Thread
         (Decode.field "id" Decode.string)
         (Decode.field "text" Decode.string)
         (Decode.field "comment_count" Decode.int)
         (Decode.maybe (Decode.field "parent_id" Decode.string))
-        (Decode.succeed (Comments []))
 
         
 -- ENCODERS
+
+
+commentEncoder text parent =
+    Encode.object
+        [ ("text", Encode.string text)
+        , ("parent", Encode.string parent)
+        ]
 
 
 threadEncoder text =
@@ -44,6 +47,14 @@ threadEncoder text =
         
 -- DATA FUNCTIONS
 
+
+createComment text parent msg = 
+    let
+        url = "http://api.threaditjs.com/comments/create"
+    in
+        Http.send msg
+            <| Http.post url (commentEncoder text parent |> Http.jsonBody) (Decode.at ["data"] threadDecoder)
+    
 
 createThread text msg = 
     let
@@ -69,28 +80,27 @@ getList msg =
             <| Http.get url (Decode.at ["data"] <| Decode.list threadDecoder)
     
     
-node thread lookup =
-    let 
-        children = Maybe.withDefault [] (Dict.get thread.id lookup)
-    in
-        { thread | children = Comments (List.map (\l -> node l lookup) children) }
-    
 transform threads =
-    let
-        root = List.take 1 threads
-        lookup = getLookupDict threads
-    in
-        List.map (\l -> node l lookup) root
-    
+    (getRoot threads, getLookup threads)
 
-getLookupDict threads =
+
+getLookup threads =
     let
-        keys = getParentKeys threads
+        keys = getKeys threads
     in
         Dict.fromList
-            <| List.map (\l -> (l, List.filter (\k -> (Maybe.withDefault "" k.parentId) == l) threads)) (Set.toList keys)
+            <| List.map (getChildren threads) (Set.toList keys)
+    
+
+getChildren threads key =
+    (key, List.filter (\l -> Maybe.withDefault "" l.parentId == key) threads)
     
     
-getParentKeys threads =
+getKeys threads =
     Set.fromList
         <| List.map (\l -> Maybe.withDefault "" l.parentId) threads
+
+
+getRoot threads =
+    List.filter (\l -> l.parentId == Nothing) threads
+        |> List.head
