@@ -1,10 +1,19 @@
-module Threads exposing (Thread, createComment, createThread, getComments, getList, transform)
+module Threads exposing (Thread, createComment, createThread, getComments, getList, transform, trim)
 
 import Dict
 import Set
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
+import Regex
+
+
+baseUrl : String
+baseUrl = "http://api.threaditjs.com"
+
+
+trimLength : Int
+trimLength = 120
 
 
 -- TYPES
@@ -54,7 +63,7 @@ threadEncoder text =
 createComment text parent msg =
     let
         url =
-            "http://api.threaditjs.com/comments/create"
+            baseUrl ++ "/comments/create"
     in
         Http.send msg <|
             Http.post url (commentEncoder text parent |> Http.jsonBody) (Decode.at [ "data" ] threadDecoder)
@@ -63,7 +72,7 @@ createComment text parent msg =
 createThread text msg =
     let
         url =
-            "http://api.threaditjs.com/threads/create"
+            baseUrl ++ "/threads/create"
     in
         Http.send msg <|
             Http.post url (threadEncoder text |> Http.jsonBody) (Decode.at [ "data" ] threadDecoder)
@@ -72,7 +81,7 @@ createThread text msg =
 getComments id msg =
     let
         url =
-            "http://api.threaditjs.com/comments/" ++ id
+            baseUrl ++ "/comments/" ++ id
     in
         Http.send msg <|
             Http.get url (Decode.at [ "data" ] <| Decode.list threadDecoder)
@@ -81,10 +90,16 @@ getComments id msg =
 getList msg =
     let
         url =
-            "http://api.threaditjs.com/threads"
+            baseUrl ++ "/threads"
     in
         Http.send msg <|
             Http.get url (Decode.at [ "data" ] <| Decode.list threadDecoder)
+
+
+trim text = 
+    String.left trimLength
+        <| Regex.replace Regex.All (Regex.regex "<(p|a|td|code|pre|table|ol|li)>") (\_ -> "")
+        <| Regex.replace Regex.All (Regex.regex "<\\/(p|a|td|code|pre|table|ol|li)>") (\_ -> "") text
 
 
 transform threads =

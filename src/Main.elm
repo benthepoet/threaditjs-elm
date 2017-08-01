@@ -98,7 +98,7 @@ viewComment lookup replies thread =
 
 renderThread thread =
     p []
-        [ a [ href ("/comments/" ++ thread.id) ] [ text thread.text ]
+        [ a [ href ("/comments/" ++ thread.id) ] [ text (Threads.trim thread.text) ]
         , p [ class "comment_count" ] [ text ((toString thread.commentCount) ++ " comment(s)") ]
         , hr [] []
         ]
@@ -131,7 +131,6 @@ updatePage maybePage model =
 
         Just page ->
             ( { model | page = page }, changeCmd page )
-
 
 
 -- MAIN PROGRAM
