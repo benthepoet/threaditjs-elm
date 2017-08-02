@@ -27,7 +27,6 @@ type alias Thread =
     }
 
 
-
 -- DECODERS
 
 
@@ -37,7 +36,6 @@ threadDecoder =
         (Decode.field "text" Decode.string)
         (Decode.field "comment_count" Decode.int)
         (Decode.maybe (Decode.field "parent_id" Decode.string))
-
 
 
 -- ENCODERS

@@ -24,14 +24,14 @@ type alias Model =
 
 
 type Msg
-    = ProcessThreads (Result Http.Error (List Threads.Thread))
-    | ProcessComments (Result Http.Error (List Threads.Thread))
-    | ProcessComment (Result Http.Error Threads.Thread)
-    | ProcessThread (Result Http.Error Threads.Thread)
+    = SetThreads (Result Http.Error (List Threads.Thread))
+    | SetThread (Result Http.Error Threads.Thread)
+    | SetComments (Result Http.Error (List Threads.Thread))
+    | SetComment (Result Http.Error Threads.Thread)
     | PageChange (Maybe Page)
-    | UpdateReply String String
-    | UpdatePost String
-    | CreatePost
+    | SetReply String String
+    | SetPost String
+    | CreateThread
     | CreateComment String String
 
 
@@ -41,17 +41,16 @@ type Page
     | NotFound
 
 
-
 -- HELPER FUNCTIONS
 
 
-changeCmd page =
+changePage page =
     case page of
         ThreadList ->
-            Threads.getList ProcessThreads
+            Threads.getList SetThreads
 
         CommentList id ->
-            Threads.getComments id ProcessComments
+            Threads.getComments id SetComments
 
         NotFound ->
             Cmd.none
@@ -76,7 +75,7 @@ viewComment lookup replies thread =
         , div [ class "reply" ]
             [ case Dict.get thread.id replies of
                 Nothing ->
-                    a [ onClick (UpdateReply thread.id "") ] [ text "Reply" ]
+                    a [ onClick (SetReply thread.id "") ] [ text "Reply" ]
 
                 Just reply ->
                     form [ onSubmit (CreateComment reply thread.id) ]
@@ -96,7 +95,7 @@ viewComment lookup replies thread =
         ]
 
 
-renderThread thread =
+viewThread thread =
     p []
         [ a [ href ("/comments/" ++ thread.id) ] [ text (Threads.trim thread.text) ]
         , p [ class "comment_count" ] [ text ((toString thread.commentCount) ++ " comment(s)") ]
@@ -104,14 +103,14 @@ renderThread thread =
         ]
 
 
-renderThreads threads =
+viewThreads threads =
     let
         threadList =
-            List.map renderThread threads
+            List.map viewThread threads
     in
         threadList
-            ++ [ form [ onSubmit CreatePost ]
-                    [ textarea [ onInput UpdatePost ] []
+            ++ [ form [ onSubmit CreateThread ]
+                    [ textarea [ onInput SetPost ] []
                     , input [ type_ "submit", value "Post" ] []
                     ]
                ]
@@ -130,7 +129,7 @@ updatePage maybePage model =
             ( model, Navigation.newUrl "/threads" )
 
         Just page ->
-            ( { model | page = page }, changeCmd page )
+            ( { model | page = page }, changePage page )
 
 
 -- MAIN PROGRAM
@@ -160,23 +159,34 @@ update msg model =
         PageChange maybePage ->
             updatePage maybePage model
 
-        ProcessComments (Ok comments) ->
-            ( { model | comments = Threads.transform comments }
-            , Cmd.none
-            )
-
-        ProcessComments (Err _) ->
-            ( model, Cmd.none )
-
-        ProcessThreads (Ok threads) ->
+        SetThreads (Ok threads) ->
             ( { model | threads = threads }
             , Cmd.none
             )
 
-        ProcessThreads (Err _) ->
+        SetThreads (Err _) ->
+            ( model, Cmd.none )
+            
+        SetThread (Ok thread) ->
+            ( { model
+                | threads = model.threads ++ [ thread ]
+                , post = ""
+              }
+            , Cmd.none
+            )
+
+        SetThread (Err _) ->
             ( model, Cmd.none )
 
-        ProcessComment (Ok thread) ->
+        SetComments (Ok comments) ->
+            ( { model | comments = Threads.transform comments }
+            , Cmd.none
+            )
+
+        SetComments (Err _) ->
+            ( model, Cmd.none )
+            
+        SetComment (Ok thread) ->
             case thread.parentId of
                 Just parentId ->
                     let
@@ -196,38 +206,27 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
-        ProcessComment (Err _) ->
+        SetComment (Err _) ->
             ( model, Cmd.none )
 
-        ProcessThread (Ok thread) ->
-            ( { model
-                | threads = model.threads ++ [ thread ]
-                , post = ""
-              }
-            , Cmd.none
-            )
-
-        ProcessThread (Err _) ->
-            ( model, Cmd.none )
-
-        UpdateReply id text ->
+        SetReply id text ->
             ( { model | replies = Dict.insert id text model.replies }, Cmd.none )
 
-        UpdatePost post ->
+        SetPost post ->
             ( { model | post = post }, Cmd.none )
 
         CreateComment text parent ->
-            ( model, Threads.createComment text parent ProcessComment )
+            ( model, Threads.createComment text parent SetComment )
 
-        CreatePost ->
-            ( model, Threads.createThread model.post ProcessThread )
+        CreateThread ->
+            ( model, Threads.createThread model.post SetThread )
 
 
 view : Model -> Html Msg
 view model =
     case model.page of
         ThreadList ->
-            div [ class "thread-list" ] (renderThreads model.threads)
+            div [ class "thread-list" ] (viewThreads model.threads)
 
         CommentList id ->
             let
@@ -237,7 +236,7 @@ view model =
                 div [ class "comments" ]
                     (case root of
                         Just thread ->
-                            [ form [ onFormInput UpdateReply ] [ viewComment lookup model.replies thread ]
+                            [ form [ onFormInput SetReply ] [ viewComment lookup model.replies thread ]
                             ]
 
                         Nothing ->
