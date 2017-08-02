@@ -1,11 +1,11 @@
 module Main exposing (..)
 
 import Dict exposing (Dict)
-import Html exposing (Html, a, div, form, h3, hr, input, p, text, textarea)
+import Html exposing (Html, a, div, form, hr, input, p, text, textarea)
 import Html.Attributes exposing (class, href, name, type_, value)
 import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Http
-import Json.Decode as Json
+import Json.Decode as Decode
 import Navigation
 import UrlParser exposing (map, oneOf, parsePath, s, string, (</>))
 import Threads
@@ -41,6 +41,7 @@ type Page
     | NotFound
 
 
+
 -- HELPER FUNCTIONS
 
 
@@ -63,10 +64,10 @@ locationChange location =
 
 onFormInput tagger =
     on "input" <|
-        Json.at [ "target" ] <|
-            Json.map2 tagger
-                (Json.field "name" Json.string)
-                (Json.field "value" Json.string)
+        Decode.at [ "target" ] <|
+            Decode.map2 tagger
+                (Decode.field "name" Decode.string)
+                (Decode.field "value" Decode.string)
 
 
 viewComment lookup replies thread =
@@ -132,6 +133,7 @@ updatePage maybePage model =
             ( { model | page = page }, changePage page )
 
 
+
 -- MAIN PROGRAM
 
 
@@ -166,7 +168,7 @@ update msg model =
 
         SetThreads (Err _) ->
             ( model, Cmd.none )
-            
+
         SetThread (Ok thread) ->
             ( { model
                 | threads = model.threads ++ [ thread ]
@@ -185,7 +187,7 @@ update msg model =
 
         SetComments (Err _) ->
             ( model, Cmd.none )
-            
+
         SetComment (Ok thread) ->
             case thread.parentId of
                 Just parentId ->

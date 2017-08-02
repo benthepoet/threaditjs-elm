@@ -9,11 +9,14 @@ import Regex
 
 
 baseUrl : String
-baseUrl = "http://api.threaditjs.com"
+baseUrl =
+    "http://api.threaditjs.com"
 
 
 trimLength : Int
-trimLength = 120
+trimLength =
+    120
+
 
 
 -- TYPES
@@ -27,6 +30,7 @@ type alias Thread =
     }
 
 
+
 -- DECODERS
 
 
@@ -36,6 +40,7 @@ threadDecoder =
         (Decode.field "text" Decode.string)
         (Decode.field "comment_count" Decode.int)
         (Decode.maybe (Decode.field "parent_id" Decode.string))
+
 
 
 -- ENCODERS
@@ -94,10 +99,10 @@ getList msg =
             Http.get url (Decode.at [ "data" ] <| Decode.list threadDecoder)
 
 
-trim text = 
-    String.left trimLength
-        <| Regex.replace Regex.All (Regex.regex "<(p|a|td|code|pre|table|ol|li)>") (\_ -> "")
-        <| Regex.replace Regex.All (Regex.regex "<\\/(p|a|td|code|pre|table|ol|li)>") (\_ -> "") text
+trim text =
+    String.left trimLength <|
+        Regex.replace Regex.All (Regex.regex "<(p|a|td|code|pre|table|ol|li)>") (\_ -> "") <|
+            Regex.replace Regex.All (Regex.regex "<\\/(p|a|td|code|pre|table|ol|li)>") (\_ -> "") text
 
 
 transform threads =
