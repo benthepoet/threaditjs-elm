@@ -2,8 +2,8 @@
   "name": "threaditjs-elm",
   "version": "1.0.0",
   "scripts": {
-    "build": "webpack",
-    "dev": "webpack-dev-server --host 0.0.0.0"
+    "build": "webpack -p",
+    "serve": "webpack-dev-server --host 0.0.0.0"
   },
   "repository": {
     "type": "git",

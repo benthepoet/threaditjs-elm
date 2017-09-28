@@ -16,6 +16,7 @@ import Threads
 
 type alias Model =
     { page : Page
+    , error : String
     , post : String
     , replies : Dict String String
     , threads : List Threads.Thread
@@ -109,12 +110,15 @@ viewThreads threads =
         threadList =
             List.map viewThread threads
     in
-        threadList
-            ++ [ form [ onSubmit CreateThread ]
-                    [ textarea [ onInput SetPost ] []
-                    , input [ type_ "submit", value "Post" ] []
-                    ]
-               ]
+        if List.isEmpty threadList then
+            []
+        else
+            threadList
+                ++ [ form [ onSubmit CreateThread ]
+                        [ textarea [ onInput SetPost ] []
+                        , input [ type_ "submit", value "Post" ] []
+                        ]
+                   ]
 
 
 route =
@@ -150,7 +154,7 @@ init : Navigation.Location -> ( Model, Cmd Msg )
 init location =
     let
         model =
-            Model NotFound "" Dict.empty [] ( Nothing, Dict.empty )
+            Model NotFound "" "" Dict.empty [] ( Nothing, Dict.empty )
     in
         updatePage (parsePath route location) model
 
@@ -167,7 +171,7 @@ update msg model =
             )
 
         SetThreads (Err _) ->
-            ( model, Cmd.none )
+            ( { model | error = "An error occurred. Please refresh the page." }, Cmd.none )
 
         SetThread (Ok thread) ->
             ( { model
@@ -186,7 +190,7 @@ update msg model =
             )
 
         SetComments (Err _) ->
-            ( model, Cmd.none )
+            ( { model | error = "An error occurred. Please refresh the page." }, Cmd.none )
 
         SetComment (Ok thread) ->
             case thread.parentId of
@@ -226,24 +230,27 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    case model.page of
-        ThreadList ->
-            div [ class "thread-list" ] (viewThreads model.threads)
+    if String.isEmpty model.error then
+        case model.page of
+            ThreadList ->
+                div [ class "thread-list" ] (viewThreads model.threads)
 
-        CommentList id ->
-            let
-                ( root, lookup ) =
-                    model.comments
-            in
-                div [ class "comments" ]
-                    (case root of
-                        Just thread ->
-                            [ form [ onFormInput SetReply ] [ viewComment lookup model.replies thread ]
-                            ]
+            CommentList id ->
+                let
+                    ( root, lookup ) =
+                        model.comments
+                in
+                    div [ class "comments" ]
+                        (case root of
+                            Just thread ->
+                                [ form [ onFormInput SetReply ] [ viewComment lookup model.replies thread ]
+                                ]
 
-                        Nothing ->
-                            []
-                    )
+                            Nothing ->
+                                []
+                        )
 
-        NotFound ->
-            div [] []
+            NotFound ->
+                div [] []
+    else
+        div [] [ text model.error ]
