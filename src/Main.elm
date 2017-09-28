@@ -166,7 +166,9 @@ update msg model =
             updatePage maybePage model
 
         SetThreads (Ok threads) ->
-            ( { model | threads = threads }
+            ( { model 
+                | threads = threads
+                , error = "" }
             , Cmd.none
             )
 
@@ -185,7 +187,9 @@ update msg model =
             ( model, Cmd.none )
 
         SetComments (Ok comments) ->
-            ( { model | comments = Threads.transform comments }
+            ( { model 
+                | comments = Threads.transform comments
+                , error = "" }
             , Cmd.none
             )
 
